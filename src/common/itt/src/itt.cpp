@@ -16,6 +16,8 @@ namespace internal {
 
 #ifdef ENABLE_PROFILING_ITT
 
+static __itt_collection_state state = __itt_get_collection_state();
+
 static size_t callStackDepth() {
     static const char* env = std::getenv("OPENVINO_TRACE_DEPTH");
     static const size_t depth = env ? std::strtoul(env, nullptr, 10) : 0;
@@ -25,28 +27,44 @@ static size_t callStackDepth() {
 static thread_local uint32_t call_stack_depth = 0;
 
 domain_t domain(char const* name) {
-    return reinterpret_cast<domain_t>(__itt_domain_create(name));
+    if (state == __itt_collection_init_successful) {
+        return reinterpret_cast<domain_t>(__itt_domain_create(name));
+    }
+    else {
+        return nullptr;
+    }
 }
 
 handle_t handle(char const* name) {
-    return reinterpret_cast<handle_t>(__itt_string_handle_create(name));
+    if (state == __itt_collection_init_successful) {
+        return reinterpret_cast<handle_t>(__itt_string_handle_create(name));
+    }
+    else {
+        return nullptr;
+    }
 }
 
 void taskBegin(domain_t d, handle_t t) {
-    if (!callStackDepth() || call_stack_depth++ < callStackDepth())
-        __itt_task_begin(reinterpret_cast<__itt_domain*>(d),
-                         __itt_null,
-                         __itt_null,
-                         reinterpret_cast<__itt_string_handle*>(t));
+    if (state == __itt_collection_init_successful) {
+        if (!callStackDepth() || call_stack_depth++ < callStackDepth())
+            __itt_task_begin(reinterpret_cast<__itt_domain*>(d),
+                            __itt_null,
+                            __itt_null,
+                            reinterpret_cast<__itt_string_handle*>(t));
+    }
 }
 
 void taskEnd(domain_t d) {
-    if (!callStackDepth() || --call_stack_depth < callStackDepth())
-        __itt_task_end(reinterpret_cast<__itt_domain*>(d));
+    if (state == __itt_collection_init_successful) {
+        if (!callStackDepth() || --call_stack_depth < callStackDepth())
+            __itt_task_end(reinterpret_cast<__itt_domain*>(d));
+    }
 }
 
 void threadName(const char* name) {
-    __itt_thread_set_name(name);
+    if (state == __itt_collection_init_successful) {
+        __itt_thread_set_name(name);
+    }
 }
 
 #else
